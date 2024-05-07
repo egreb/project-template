@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/egreb/boilerplate/errors"
+	"github.com/egreb/boilerplate/models"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lib/pq"
 )
@@ -39,7 +40,7 @@ func (u *UsersRepository) CreateUser(ctx context.Context, username string, passw
 	return nil
 }
 
-func (u *UsersRepository) GetUserByUsername(ctx context.Context, username string) (string, string, []byte, error) {
+func (u *UsersRepository) GetUserCredentialsByUsername(ctx context.Context, username string) (string, string, []byte, error) {
 	var id string
 	var password string
 	var salt []byte
@@ -69,4 +70,39 @@ func (u *UsersRepository) GetUserByUsername(ctx context.Context, username string
 	}
 
 	return id, password, salt, nil
+}
+
+func (u *UsersRepository) GetMe(ctx context.Context, sessionToken string) (*models.Me, error) {
+	var me models.Me
+
+	row := u.db.QueryRow(ctx, `
+	SELECT 
+		id, 
+		username
+	FROM 
+		users
+	WHERE
+		id = (
+			SELECT 
+				value
+			FROM
+				sessions
+			WHERE
+				id = $1
+		)::uuid;
+	`, sessionToken)
+	err := row.Scan(&me.ID, &me.Username)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.NotFound{
+				Err: fmt.Errorf("user not found in session %s", sessionToken),
+			}
+		}
+
+		return nil, errors.InternalError{
+			Err: fmt.Errorf("something went wrong looking up user: %w", err),
+		}
+	}
+
+	return &me, nil
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/egreb/boilerplate/auth"
 	"github.com/egreb/boilerplate/db/repo"
 	"github.com/egreb/boilerplate/errors"
+	"github.com/egreb/boilerplate/middleware"
 )
 
 type credentials struct {
@@ -55,7 +56,7 @@ func signinUserHandler(ur repo.UsersRepository, sr repo.SessionsRepository) apiH
 			}
 		}
 
-		id, hashedPassword, salt, err := ur.GetUserByUsername(r.Context(), creds.Username)
+		id, hashedPassword, salt, err := ur.GetUserCredentialsByUsername(r.Context(), creds.Username)
 		if err != nil {
 			return fmt.Errorf("unable to signin: %w", err)
 		}
@@ -79,5 +80,16 @@ func signinUserHandler(ur repo.UsersRepository, sr repo.SessionsRepository) apiH
 		})
 
 		return writeJSON(w, http.StatusOK, "ok")
+	}
+}
+
+func meHandler(ur repo.UsersRepository) apiHandler {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		me, err := middleware.User(r.Context(), ur)
+		if err != nil {
+			return fmt.Errorf("could not get user from session: %w", err)
+		}
+
+		return writeJSON(w, http.StatusOK, me)
 	}
 }
