@@ -11,6 +11,12 @@ interface HttpClientResponse<T = Record<string, unknown>> extends Response {
     data: T | null
 }
 
+type ResponseError<T> = {
+    status: number
+    statusText: string
+    data: T | null
+}
+
 async function getJSON<T>(res: Response): Promise<T | null> {
     try {
         return (await res.json()) as T
@@ -22,10 +28,10 @@ async function getJSON<T>(res: Response): Promise<T | null> {
 class HttpClient {
     constructor() {}
 
-    public async get<T = unknown, E = unknown>(
+    public async get<T = unknown, E = ResponseError<unknown>>(
         url: URL,
         opts?: Options
-    ): Promise<[null, HttpClientResponse<T>] | [E, null]> {
+    ): Promise<[null, HttpClientResponse<T>] | [E, null] | [E, HttpClientResponse<T>]> {
         try {
             const res = await fetch(url, {
                 ...opts,
@@ -35,7 +41,11 @@ class HttpClient {
 
             const data = await getJSON<T>(res)
             if (!res.ok) {
-                return [data as E, null]
+                const { status, statusText, headers } = res
+                return [
+                    { status, statusText, data } as E,
+                    { status, statusText, headers, data } as HttpClientResponse<T>,
+                ]
             }
 
             const response: Partial<HttpClientResponse<T>> = res
@@ -43,6 +53,7 @@ class HttpClient {
 
             return [null, response as HttpClientResponse<T>]
         } catch (e) {
+            console.log({ e })
             return [e as E, null]
         }
     }

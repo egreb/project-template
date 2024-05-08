@@ -28,7 +28,7 @@ func main() {
 	sessionsRepository := repo.NewSessionsRespository(db)
 
 	r := http.NewServeMux()
-	handlers.SetupRoutes(r, *usersRepository, *sessionsRepository)
+	handlers.SetupRoutes(r, usersRepository, sessionsRepository)
 
 	log.Println("server listening at port:", c.ServerPort)
 	http.ListenAndServe(":"+c.ServerPort, r)

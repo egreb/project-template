@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/egreb/boilerplate/auth"
 	"github.com/egreb/boilerplate/db/repo"
@@ -16,7 +17,7 @@ type credentials struct {
 	Password string `json:"password"`
 }
 
-func registerUserHandler(ur repo.UsersRepository) apiHandler {
+func registerUserHandler(ur *repo.UsersRepository) apiHandler {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		var creds credentials
 
@@ -45,7 +46,7 @@ func registerUserHandler(ur repo.UsersRepository) apiHandler {
 	}
 }
 
-func signinUserHandler(ur repo.UsersRepository, sr repo.SessionsRepository) apiHandler {
+func signinUserHandler(ur *repo.UsersRepository, sr *repo.SessionsRepository) apiHandler {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		var creds credentials
 
@@ -83,11 +84,37 @@ func signinUserHandler(ur repo.UsersRepository, sr repo.SessionsRepository) apiH
 	}
 }
 
-func meHandler(ur repo.UsersRepository) apiHandler {
+func signoutUserHandler(sr *repo.SessionsRepository) apiHandler {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		tok, ok := middleware.SessionToken(r.Context())
+		if !ok {
+			return writeJSON(w, http.StatusOK, "ok")
+		}
+
+		err := sr.Delete(r.Context(), tok)
+		if err != nil {
+			return writeJSON(w, http.StatusInternalServerError, "Something went wrong")
+		}
+
+		c, err := r.Cookie("session_token")
+		if err != nil {
+			if err == http.ErrNoCookie {
+				return writeJSON(w, http.StatusNotFound, "This makes no sense")
+			}
+		}
+
+		c.Expires = time.Now()
+		http.SetCookie(w, c)
+
+		return writeJSON(w, http.StatusOK, "ok")
+	}
+}
+
+func meHandler(ur *repo.UsersRepository) apiHandler {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		me, err := middleware.User(r.Context(), ur)
 		if err != nil {
-			return fmt.Errorf("could not get user from session: %w", err)
+			return writeJSON(w, http.StatusUnauthorized, "Unauthorized")
 		}
 
 		return writeJSON(w, http.StatusOK, me)

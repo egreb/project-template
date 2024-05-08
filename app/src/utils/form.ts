@@ -6,6 +6,15 @@ export function form<T = unknown>(schema: v.BaseSchema<T>) {
         return v.safeParse(schema, data)
     }
 
+    const values = (data: unknown) => {
+        const res = parse(data)
+        if (!res.success) {
+            return null
+        }
+
+        return res.output as v.Input<typeof schema>
+    }
+
     const validate = (data: FormData) => {
         const result = parse(Object.fromEntries(data))
         if (result.success) {
@@ -35,8 +44,9 @@ export function form<T = unknown>(schema: v.BaseSchema<T>) {
     }
 
     return {
-        validate,
-        request,
         parse,
+        values,
+        request,
+        validate,
     }
 }

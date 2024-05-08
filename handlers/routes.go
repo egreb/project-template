@@ -7,7 +7,7 @@ import (
 	"github.com/egreb/boilerplate/middleware"
 )
 
-func SetupRoutes(router *http.ServeMux, ur repo.UsersRepository, sr repo.SessionsRepository) {
+func SetupRoutes(router *http.ServeMux, ur *repo.UsersRepository, sr *repo.SessionsRepository) {
 	authMiddleware := middleware.Authenticate(sr)
 
 	router.HandleFunc("GET /yo", yohandler)
@@ -16,6 +16,7 @@ func SetupRoutes(router *http.ServeMux, ur repo.UsersRepository, sr repo.Session
 
 	router.HandleFunc("POST /api/auth/signin", handler(signinUserHandler(ur, sr)))
 	router.HandleFunc("POST /api/auth/register", handler(registerUserHandler(ur)))
+	router.HandleFunc("POST /api/auth/signout", handler(signoutUserHandler(sr)))
 	router.Handle("GET /api/auth/me", authMiddleware(
 		http.HandlerFunc(handler(me)),
 	))

@@ -21,15 +21,15 @@ var (
 	contextKeyUser = middlewareContextKey("session-user-id")
 )
 
-func getSessionTokenFromContext(ctx context.Context) (string, bool) {
+func SessionToken(ctx context.Context) (string, bool) {
 	tokenStr, ok := ctx.Value(contextKeyUser).(string)
 
 	return tokenStr, ok
 
 }
 
-func User(ctx context.Context, ur repo.UsersRepository) (*models.Me, error) {
-	tok, ok := getSessionTokenFromContext(ctx)
+func User(ctx context.Context, ur *repo.UsersRepository) (*models.Me, error) {
+	tok, ok := SessionToken(ctx)
 	if !ok {
 		return nil, errors.NotFound{
 			Err: fmt.Errorf("user not found"),
@@ -44,7 +44,7 @@ func User(ctx context.Context, ur repo.UsersRepository) (*models.Me, error) {
 	return me, nil
 }
 
-func Authenticate(sr repo.SessionsRepository) Middleware {
+func Authenticate(sr *repo.SessionsRepository) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -52,6 +52,7 @@ func Authenticate(sr repo.SessionsRepository) Middleware {
 			if err != nil {
 				if err == http.ErrNoCookie {
 					w.WriteHeader(http.StatusUnauthorized)
+					w.Write([]byte("Unauthorized"))
 					return
 				}
 
