@@ -6,6 +6,10 @@ DB_URL=postgresql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?s
 
 server:
 	go run ./cmd/server/main.go
+migrations:
+	go run ./cmd/migrate/main.go
+frontend:
+	pnpm -C ./app install && pnpm -C ./app run dev
 db-up:
 	docker compose up -d
 db-stop:
