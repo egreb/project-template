@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/egreb/boilerplate/db/repo"
-	"github.com/egreb/boilerplate/errors"
+	"github.com/egreb/boilerplate/internalerrors"
 	"github.com/egreb/boilerplate/models"
 )
 
@@ -29,16 +29,16 @@ func SessionToken(ctx context.Context) (string, bool) {
 }
 
 func User(ctx context.Context, ur *repo.UsersRepository) (*models.Me, error) {
-	tok, ok := SessionToken(ctx)
-	if !ok {
-		return nil, errors.NotFound{
+	tok, found := SessionToken(ctx)
+	if !found {
+		return nil, &internalerrors.NotFound{
 			Err: fmt.Errorf("user not found"),
 		}
 	}
 
 	me, err := ur.GetMe(ctx, tok)
 	if err != nil {
-		return nil, fmt.Errorf("failed getting user from session context: %w", err)
+		return nil, err
 	}
 
 	return me, nil
@@ -62,7 +62,7 @@ func Authenticate(sr *repo.SessionsRepository) Middleware {
 
 			sessionToken := c.Value
 
-			userSession, err := sr.Get(ctx, sessionToken)
+			userSession, err := sr.GetSession(ctx, sessionToken)
 			if err != nil {
 				slog.Warn("auth", "middleware", "error", err)
 				w.WriteHeader(http.StatusUnauthorized)

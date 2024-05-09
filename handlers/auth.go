@@ -8,7 +8,7 @@ import (
 
 	"github.com/egreb/boilerplate/auth"
 	"github.com/egreb/boilerplate/db/repo"
-	"github.com/egreb/boilerplate/errors"
+	"github.com/egreb/boilerplate/internalerrors"
 	"github.com/egreb/boilerplate/middleware"
 )
 
@@ -23,23 +23,18 @@ func registerUserHandler(ur *repo.UsersRepository) apiHandler {
 
 		err := json.NewDecoder(r.Body).Decode(&creds)
 		if err != nil {
-			return errors.BadRequest{
-				Err: fmt.Errorf("error parsing register request: %w", err),
-			}
+			return &internalerrors.UnprocessableError{}
 		}
 
 		salt, err := auth.GenerateRandomSalt(24)
 		if err != nil {
-			// TODO: Write handleerr function for this to do logging
-			return writeJSON(w, http.StatusInternalServerError, "something went wrong")
+			return err
 		}
 		hashedPassword := auth.HashPassword(creds.Password, salt)
 
 		err = ur.CreateUser(r.Context(), creds.Username, hashedPassword, salt)
 		if err != nil {
-			return errors.InternalError{
-				Err: fmt.Errorf("error storing user: %w", err),
-			}
+			return err
 		}
 
 		return writeJSON(w, http.StatusCreated, "success")
@@ -52,24 +47,22 @@ func signinUserHandler(ur *repo.UsersRepository, sr *repo.SessionsRepository) ap
 
 		err := json.NewDecoder(r.Body).Decode(&creds)
 		if err != nil {
-			return errors.BadRequest{
-				Err: fmt.Errorf("error parsing register request: %w", err),
-			}
+			return &internalerrors.UnprocessableError{}
 		}
 
 		id, hashedPassword, salt, err := ur.GetUserCredentialsByUsername(r.Context(), creds.Username)
 		if err != nil {
-			return fmt.Errorf("unable to signin: %w", err)
+			return err
 		}
 
 		ok := auth.ComparePasswords(hashedPassword, creds.Password, salt)
 		if !ok {
-			return writeJSON(w, http.StatusBadRequest, "Username or password is wrong")
+			return NewApiError(http.StatusBadRequest, fmt.Errorf("failed to login, please try again"))
 		}
 
-		session, err := sr.Create(r.Context(), id)
+		session, err := sr.CreateSession(r.Context(), id)
 		if err != nil {
-			return writeJSON(w, http.StatusInternalServerError, "Something went wrong")
+			return err
 		}
 
 		http.SetCookie(w, &http.Cookie{
@@ -88,12 +81,12 @@ func signoutUserHandler(sr *repo.SessionsRepository) apiHandler {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		tok, ok := middleware.SessionToken(r.Context())
 		if !ok {
-			return writeJSON(w, http.StatusOK, "ok")
+			return NewApiError(http.StatusNotFound, fmt.Errorf("session not found"))
 		}
 
 		err := sr.Delete(r.Context(), tok)
 		if err != nil {
-			return writeJSON(w, http.StatusInternalServerError, "Something went wrong")
+			return err
 		}
 
 		c, err := r.Cookie("session_token")
@@ -101,6 +94,7 @@ func signoutUserHandler(sr *repo.SessionsRepository) apiHandler {
 			if err == http.ErrNoCookie {
 				return writeJSON(w, http.StatusNotFound, "This makes no sense")
 			}
+			return err
 		}
 
 		c.Expires = time.Now()
@@ -114,7 +108,7 @@ func meHandler(ur *repo.UsersRepository) apiHandler {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		me, err := middleware.User(r.Context(), ur)
 		if err != nil {
-			return writeJSON(w, http.StatusUnauthorized, "Unauthorized")
+			return err
 		}
 
 		return writeJSON(w, http.StatusOK, me)

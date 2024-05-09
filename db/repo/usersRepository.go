@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/egreb/boilerplate/errors"
+	"github.com/egreb/boilerplate/internalerrors"
 	"github.com/egreb/boilerplate/models"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lib/pq"
 )
@@ -30,11 +31,11 @@ func (u *UsersRepository) CreateUser(ctx context.Context, username string, passw
 	if err != nil {
 		if perr, ok := err.(*pq.Error); ok {
 			if perr.Constraint != "" {
-				return errors.BadRequest{Err: fmt.Errorf("unable to create user because of constraint: %w", err)}
+				return &internalerrors.BadRequest{Err: fmt.Errorf("unable to create user because of constraint: %w", err)}
 			}
 		}
 
-		return errors.InternalError{Err: fmt.Errorf("failed to create user: %w", err)}
+		return &internalerrors.InternalError{Err: fmt.Errorf("failed to create user: %w", err)}
 	}
 
 	return nil
@@ -58,13 +59,12 @@ func (u *UsersRepository) GetUserCredentialsByUsername(ctx context.Context, user
 
 	err := row.Scan(&id, &password, &salt)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return id, password, salt, errors.NotFound{
-				Err: fmt.Errorf("username %s not found: %w", username, err),
+		if err == pgx.ErrNoRows {
+			return id, password, salt, &internalerrors.NotFound{
+				Err: fmt.Errorf("user by %s not found", username),
 			}
 		}
-
-		return id, password, salt, errors.InternalError{
+		return id, password, salt, &internalerrors.InternalError{
 			Err: fmt.Errorf("failed getting user by username: %w", err),
 		}
 	}
@@ -94,12 +94,10 @@ func (u *UsersRepository) GetMe(ctx context.Context, sessionToken string) (*mode
 	err := row.Scan(&me.ID, &me.Username)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, errors.NotFound{
-				Err: fmt.Errorf("user not found in session %s", sessionToken),
-			}
+			return nil, &internalerrors.NotFound{}
 		}
 
-		return nil, errors.InternalError{
+		return nil, &internalerrors.InternalError{
 			Err: fmt.Errorf("something went wrong looking up user: %w", err),
 		}
 	}

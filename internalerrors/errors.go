@@ -1,4 +1,4 @@
-package errors
+package internalerrors
 
 type NotFound struct {
 	Err error
@@ -33,5 +33,17 @@ func (e InternalError) Error() string {
 }
 
 func (e InternalError) Unwrap() error {
+	return e.Err
+}
+
+type UnprocessableError struct {
+	Err error
+}
+
+func (e UnprocessableError) Error() string {
+	return e.Err.Error()
+}
+
+func (e UnprocessableError) Unwrap() error {
 	return e.Err
 }

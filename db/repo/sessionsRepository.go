@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/egreb/boilerplate/errors"
+	"github.com/egreb/boilerplate/internalerrors"
 	"github.com/egreb/boilerplate/models"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -21,7 +21,7 @@ func NewSessionsRespository(db *pgxpool.Pool) *SessionsRepository {
 	}
 }
 
-func (sr *SessionsRepository) Create(ctx context.Context, userId string) (*models.Session, error) {
+func (sr *SessionsRepository) CreateSession(ctx context.Context, userId string) (*models.Session, error) {
 	var s models.Session
 	row := sr.db.QueryRow(ctx, `
 		INSERT INTO 
@@ -31,7 +31,7 @@ func (sr *SessionsRepository) Create(ctx context.Context, userId string) (*model
 			id, expires`, userId, time.Now().Add(time.Hour*24))
 	err := row.Scan(&s.ID, &s.Expires)
 	if err != nil {
-		return nil, errors.InternalError{
+		return nil, &internalerrors.InternalError{
 			Err: fmt.Errorf("unable to create session: %w", err),
 		}
 	}
@@ -39,7 +39,7 @@ func (sr *SessionsRepository) Create(ctx context.Context, userId string) (*model
 	return &s, nil
 }
 
-func (sr *SessionsRepository) Get(ctx context.Context, sessionToken string) (*models.Session, error) {
+func (sr *SessionsRepository) GetSession(ctx context.Context, sessionToken string) (*models.Session, error) {
 	var s models.Session
 	row := sr.db.QueryRow(ctx, `
 		SELECT 
@@ -52,11 +52,11 @@ func (sr *SessionsRepository) Get(ctx context.Context, sessionToken string) (*mo
 	err := row.Scan(&s.ID, &s.Expires)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			return nil, errors.NotFound{
+			return nil, &internalerrors.NotFound{
 				Err: fmt.Errorf("session not found"),
 			}
 		}
-		return nil, errors.InternalError{
+		return nil, &internalerrors.InternalError{
 			Err: fmt.Errorf("failed getting session token: %w", err),
 		}
 	}
@@ -73,12 +73,12 @@ func (sr *SessionsRepository) Delete(ctx context.Context, sessionToken string) e
 		sessionToken)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return errors.NotFound{
+			return &internalerrors.NotFound{
 				Err: fmt.Errorf("session not found"),
 			}
 		}
 
-		return errors.InternalError{
+		return &internalerrors.InternalError{
 			Err: fmt.Errorf("unable to delete session: %w", err),
 		}
 	}
