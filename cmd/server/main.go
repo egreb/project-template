@@ -31,6 +31,6 @@ func main() {
 	handlers.SetupRoutes(r, usersRepository, sessionsRepository)
 
 	log.Println("server listening at port:", c.ServerPort)
-	http.ListenAndServe(":"+c.ServerPort, r)
+	log.Fatalln(http.ListenAndServe(":"+c.ServerPort, r))
 
 }
